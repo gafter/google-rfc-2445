@@ -1,0 +1,106 @@
+<!-- Copyright (C) 2006 Google Inc.
+  - 
+  - Licensed under the Apache License, Version 2.0 (the "License");
+  - you may not use this file except in compliance with the License.
+  - You may obtain a copy of the License at
+  - 
+  -      http://www.apache.org/licenses/LICENSE-2.0
+  - 
+  - Unless required by applicable law or agreed to in writing, software
+  - distributed under the License is distributed on an "AS IS" BASIS,
+  - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  - See the License for the specific language governing permissions and
+  - limitations under the License.
+ -->
+
+<project name="Rfc2445" default="default" basedir=".">
+  <description>An implementation of RFC2445 recurrence rules</description>
+  <!--== inputs ==-->
+  <property name="src" location="src"/>
+  <property name="testsrc" location="test"/>
+  <property name="third_party" location="third_party"/>
+  <!--== outputs ==-->
+  <property name="lib" location="lib"/>
+  <property name="testlib" location="testlib"/>
+  <property name="docs" location="docs"/>
+  <property name="jars" location="jars"/>
+
+  <path id="build.class.path">
+    <pathelement location="${lib}"/>
+    <pathelement path="${third_party}/joda-time/joda-time.jar"/>
+  </path>
+
+  <path id="test.class.path">
+    <pathelement location="${lib}"/>
+    <pathelement location="${testlib}"/>
+    <pathelement path="${third_party}/joda-time/joda-time.jar"/>
+    <pathelement path="${third_party}/junit/junit.jar"/>
+  </path>
+
+  <!--== rules ==-->
+  <target name="default" depends="rfc2445,tests,docs"/>
+
+  <target name="clean">
+    <delete dir="${lib}"/>
+    <delete dir="${jars}"/>
+    <delete dir="${testlib}"/>
+    <delete dir="${docs}"/>
+  </target>
+
+  <target name="rfc2445">
+    <mkdir dir="${lib}"/>
+    <mkdir dir="${jars}"/>
+
+    <javac srcdir="${src}" destdir="${lib}" debug="true"
+     target="1.5" source="1.5">
+      <classpath refid="build.class.path"/>
+    </javac>
+    <jar jarfile="${jars}/rfc2445.jar" basedir="${lib}"/>
+  </target>
+
+  <!-- compile this if you don't want joda-time support -->
+  <target name="rfc2445-no-joda">
+    <mkdir dir="${lib}"/>
+    <mkdir dir="${jars}"/>
+
+    <javac destdir="${lib}" debug="true"
+     target="1.5" source="1.5">
+      <src path="${src}"/>
+      <exclude name="**/compat/jodatime/*.java"/>
+      <!-- compilerarg line="-Xlint:unchecked"/ -->
+    </javac>
+    <jar jarfile="${jars}/rfc2445-no-joda.jar" basedir="${lib}"/>
+  </target>
+
+  <target name="tests" depends="rfc2445">
+    <mkdir dir="${testlib}"/>
+    <javac srcdir="${testsrc}" destdir="${testlib}" debug="true">
+      <classpath refid="build.class.path"/>
+    </javac>
+  </target>
+
+  <target name="docs">
+    <mkdir dir="${docs}"/>
+    <javadoc sourcepath="${src}" destdir="${docs}" access="protected"
+     author="true"
+     bottom="Copyright (C) 2008 Google Inc.&lt;br&gt;
+             &lt;a href=http://www.apache.org/licenses/LICENSE-2.0&gt;
+             Licensed under the Apache License, Version 2.0&lt;/a&gt;"
+     overview="${src}/overview.html"
+     docencoding="utf-8"
+     packagenames="*">
+      <classpath refid="build.class.path"/>
+    </javadoc>
+  </target>
+
+  <target name="runtests" depends="tests">
+    <junit printsummary="yes">
+      <classpath refid="test.class.path"/>
+
+      <formatter type="plain" usefile="false"/>
+
+      <test name="com.google.ical.AllTests"/>
+    </junit>
+  </target>
+
+</project>
