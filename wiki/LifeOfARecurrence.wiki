@@ -3,12 +3,31 @@
 
 = Life of a Recurrence =
 
-Processing a recurrence requires moving through several stages:
+Processing a recurrence requires moving through the following stages:
   # The RRULE, EXRULE, RDATE, and EXDATE content lines are extracted from a VEVENT, along with context like the DTSTART, DTEND, DURATION, and TZID.
   # A RecurrenceIterable is created
     # The content lines are parsed to [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/iter/RecurrenceIterable.html RecurrenceIterable]s
     # A [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/RecurrenceIteratorFactory.java factory] breaks RRULEs into pieces doing performing some query-optimization-like operations
+      # The factory looks at each clause (FREQ, BYDAY, BYMONTH) and assumes defaults for missing clauses
+      # The factory chooses [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/Generators.java generators] or [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/Filters.java filters] for each clause.  It chooses one generator for years, another for months, another for days, etc.  E.g., RRULE:FREQ=MONTHLY,BYMONTH=3,6 has a month generator that yields the values 3 and 6 for each year.  If two clauses affect the same period (year/month/day) then  the one that specifies the fewest occurrences is made into a generator, and the other is made into a filter, so for RRULE:FREQ=DAILY,BYMONTHDAY=13,BYDAY=FR the BYMONTHDAY is turned into a generator that produces the 13th of each month, and the BYDAY clause is turned into a filter that blocks any day which is not a Friday.
+      # The factory checks for a [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/Conditions.java condition] which might causes iteration to end, such as UNTIL=<date>.
+      # The factory produces an [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/InstanceGenerators.java instance generator] to handle BYSETPOS clauses.  The instance generator's job is to run the generators to generate dates, filtering out the ones rejected by the filters until it has all the dates within the period identifies by the FREQ= clause.  Then it can apply any BYSETPOS rule as a further filter.
   # The RecurrenceIterable is used to create a [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/iter/RecurrenceIterator.html RecurrenceIterator]
   # The RecurrenceIterators are combined via a [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/CompoundIteratorImpl.java CompoundIteratorImpl] which filters out duplicates and exclusions using a {{{pqueue}}}
   # The RecurrenceIterator is iterated.
+    # Check the output queue
+      # If there is a date on the output queue, pop it off
+        # If the exit condition (see UNTIL/COUNT above) is met, stop iteration
+        # else return it
+      # Else continue below to generate dates to push onto the output queue.
+    # The DTSTART is used to seed a [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/util/DTBuilder.java date builder], which is a mutable data structure that can be converted to a date.
+    # Each of the generators are run in order.  The year generator generates a date, and then the month generator generates a month within that year, and the day generator generates a day within that month, etc.  See [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/InstanceGenerators.java?r=17 InstanceGenerators.serialInstanceGenerator] which drives generators until a complete date is ready.
+      # Think of the generators as gears in a clock.  The year gear rotates once every year.  The month gear rotates 12 times as fast.  The day gear rotates faster still.  They have teeth that determine which dates are generated, so a BYMONTH=3 gear only has a tooth at the 3rd month.  When all the teeth line up at the top, the machine emits a date.  Each Generator's jobs is to model one of these gears efficiently, and so a month generator generates the months in the year that was stored into the DTBuilder by the year generator, without touching the day field since that will be filled by the day generator.  Each generator can either produce a date, or return false indicating no more dates in the period specified by the larger generators.
+      # Some RRULEs will never generate any dates, such as RRULE:FREQ=YEARLY;BYMONTH=2;BYDAY=29;INTERVAL=4 when DTSTART is not on a leap year.  These conditions are hard to check exhaustively in the factory, so the year generator implements  [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/ThrottledGenerator.java ThrottledGenerator] so that it can abort the iterator if it becomes apparent it will never generate a valid date.
+    # The instance generator applies any filters (see above)
+    # We check the exit condition (see above)
+    # If the instance generator was produced from a BYSETPOS rule, then
+      # We keep producing more dates until we see a date that is in a different period (e.g., a different month if FREQ=MONTHLY, or a different week if FREQ=WEEKLY)
+      # We compute the BYSETPOS set and filter out the results
+    # However many dates that survived the BYSETPOS rule are pushed onto the output queue to be produced by RecurrenceIterator.next in order.
   # A compatibility layer converts from an internal date value (that closely maps that used by RFC2445) to common date libraries such as [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/compat/javautil/package-summary.html java.util] or [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/compat/jodatime/package-summary.html joda time]
