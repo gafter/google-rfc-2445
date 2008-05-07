@@ -1,0 +1,14 @@
+#summary Which classes are involved in each stage of processing an RRULE?
+#labels Phase-Design
+
+= Life of a Recurrence =
+
+Processing a recurrence requires moving through several stages:
+  # The RRULE, EXRULE, RDATE, and EXDATE content lines are extracted from a VEVENT, along with context like the DTSTART, DTEND, DURATION, and TZID.
+  # A RecurrenceIterable is created
+    # The content lines are parsed to [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/iter/RecurrenceIterable.html RecurrenceIterable]s
+    # A [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/RecurrenceIteratorFactory.java factory] breaks RRULEs into pieces doing performing some query-optimization-like operations
+  # The RecurrenceIterable is used to create a [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/iter/RecurrenceIterator.html RecurrenceIterator]
+  # The RecurrenceIterators are combined via a [http://code.google.com/p/google-rfc-2445/source/browse/trunk/src/com/google/ical/iter/CompoundIteratorImpl.java CompoundIteratorImpl] which filters out duplicates and exclusions using a {{{pqueue}}}
+  # The RecurrenceIterator is iterated.
+  # A compatibility layer converts from an internal date value (that closely maps that used by RFC2445) to common date libraries such as [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/compat/javautil/package-summary.html java.util] or [http://google-rfc-2445.googlecode.com/svn/trunk/snapshot/docs/com/google/ical/compat/jodatime/package-summary.html joda time]
